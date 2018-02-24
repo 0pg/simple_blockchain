@@ -16,13 +16,18 @@ class Blockchain(object):
 		self.current_transactions = []
 		self.nodes = set()
 		self.new_block(previous_hash=1)
-
+	
+	'''
+		블럭의 구조 정의
+		:param
+		privious_hash : 첫번째 블록 생성 시 previous hash 값을 정의
+	'''	
 	def new_block(self, previous_hash=None):
 		block_header = {
 			'index' : len(self.chain) + 1,
 			'timestamp' : time(),
 			'proof' : 0, 
-			'previous_hash' : previous_hash or self.hash(self.chain[-1]),
+			'previous_hash' : previous_hash or self.chain[-1]['block_hash'],
 			'transaction_hash': self.merkle,
 		}
 		block_header = self.proof_of_work(block_header)
@@ -35,19 +40,31 @@ class Blockchain(object):
 			'transactions' : transactions,
 			}
 		self.current_transactions = []
-
 		self.chain.append(block)
+		
 		return block
+	
+	'''
+		새로운 노드를 노드 리스트에 추가
+		:param
+		address : 새로운 노드의 주소
+	'''
 	def register_node(self, address):
 		parsed_url = urlparse(address)
 		if parsed_url.netloc:
 			self.nodes.add(parsed_url.netloc)
 		elif parsed_url.path:
-            # Accepts an URL without scheme like '192.168.0.5:5000'.
 			self.nodes.add(parsed_url.path)
 		else:
 			raise ValueError('Invalid URL')		
-
+	
+	'''
+		새로운 거래내용 추가
+		:param
+		sender : 보내는 계정
+		recipient : 받는 계정
+		amount : 상세 거래 내역
+	'''
 	def new_transaction(self, sender, recipient, amount):
 		self.current_transactions.append({
 			'sender' : sender,
@@ -57,13 +74,19 @@ class Blockchain(object):
 
 		return self.last_block['block_header']['index'] + 1
 
+	'''
+		거래내용을 sha256 해시함수를 사용해 변환
+		-OrderedDict 형태로 저장되며, root node 의 index를 1로 시작하여 BFS 알고리즘에 따라 노드에 부여한 index를 key로 가짐
+		:param
+		merkle : 블록의 들어갈 거래 내역
+	'''
 	def transaction_record(self,merkle):
 		past_transaction = self.past_transaction
 		length = len(merkle)
 		dep = int(math.log2(length))
 		nodes = pow(2,dep)
 		extra_nodes = length - nodes
-		non = 2 * extra_nodes + pow(2,dep+1) - 1
+		non = pow(2,dep+1)
 		
 		for index in range(0, extra_nodes):
 			left = merkle.pop(index)
@@ -71,40 +94,50 @@ class Blockchain(object):
 			left_hash = self.hash(left)
 			right_hash = self.hash(right)
 			past_transaction[non] = left_hash
-			non -= 1
+			non += 1
 			past_transaction[non] = right_hash
-			non -= 1
+			non += 1
 			merkle.insert(index, left_hash+right_hash)
 
 		while True:  
 			length = len(merkle)
 			dep = int(math.log2(length))
-			nodes = pow(2,dep)      
+			nodes = non = pow(2,dep)      
 			
 			for index in range(0, int(nodes/2)):
 				left = merkle.pop(index)
 				left_hash = self.hash(left)
 				past_transaction[non] = left_hash
-				non -= 1
+				non += 1
 				right = merkle.pop(index)
 				right_hash = self.hash(right)
 				past_transaction[non] = right_hash
-				non -= 1
+				non += 1
 				merkle.insert(index, left_hash+right_hash)
 		
 			if length is 1:
 				merkle = self.hash(merkle)
-				past_transaction[non] = merkle
+				past_transaction[1] = merkle
 				self.past_transaction = past_transaction
 				self.merkle = merkle
 				break
 
+	'''
+		블럭체인의 nonce 값을 구하는 과정. proof 값을 1씩 증가시키며 적합한 해시값을 찾을 때 까지 반복
+		:param
+		block_h : 블럭의 헤더정보
+	'''
 	def proof_of_work(self, block_h):
 		while self.valid_proof(block_h) is False:
 			block_h['proof'] += 1
 
 		return block_h
 
+	'''
+		블럭체인이 유효한지 검증하는 과정
+		:param
+		chain : 현재 블럭들이 포함된 리스트
+	'''
 	def valid_chain(self, chain):
 		last_block = chain[0]
 		current_index = 1
@@ -126,7 +159,9 @@ class Blockchain(object):
 			current_index += 1
 		return True
 
-
+	'''
+		블럭이 분기되었을 때 충돌을 해결. 연결된 블럭의 길이가 긴 쪽의 체인이 유지된다.
+	'''
 	def resolve_conflicts(self):
 		neighbours = self.nodes
 		new_chain = None
@@ -148,13 +183,11 @@ class Blockchain(object):
 
 		return False
 
-
-
-	@staticmethod
-	def hash(key):
-		key_string = json.dumps(key, sort_keys=True).encode()
-		return hashlib.sha256(key_string).hexdigest()
-
+	'''
+		블럭의 해시값을 구하는 과정. 해시값의 첫 4자리가 '0000'이면 적합한 것으로 함
+		:param
+		blokc_h : 블럭의 헤더정보
+	'''
 	def valid_proof(self, block_h):
 		guess_hash = self.hash(block_h)
 		if guess_hash[ :4] == "0000":
@@ -163,6 +196,17 @@ class Blockchain(object):
 		else:
 			return False
 
+	'''
+		인자로 넘어온 값의 sha256 해시를 반환
+	'''
+	@staticmethod
+	def hash(key):
+		key_string = json.dumps(key, sort_keys=True).encode()
+		return hashlib.sha256(key_string).hexdigest()
+
+	'''
+		현재 블록의 전 블록을 반환
+	'''
 	@property
 	def last_block(self):
 		return self.chain[-1]
@@ -187,15 +231,6 @@ def mine():
 	merkle = blockchain.current_transactions
 	blockchain.transaction_record(merkle)
 	block = blockchain.new_block(previous_hash)
-
-	# response = {
-	# 	'message' : "New block Forged",
-	# 	'index' : block['index'],
-	# 	'transactions' : block['transactions'],
-	# 	'proof' : block['proof'],
-	# 	'previous_hash' : block['previous_hash'],
-	# 	'transaction_hash' : block['transaction_hash'],
-	# }
 	response = block
 	return jsonify(response), 200
 
@@ -256,7 +291,6 @@ def consensus():
 	return jsonify(response), 200
 
 if __name__ == '__main__':
-	#app.run(host='0.0.0.0', port=5000)
 	from argparse import ArgumentParser
 
 	parser = ArgumentParser()
