@@ -1,5 +1,6 @@
-import hashlib, math
+import hashlib
 import json, requests
+from math import log2
 from time import time
 from textwrap import dedent
 from uuid import uuid4
@@ -83,7 +84,7 @@ class Blockchain(object):
 	def transaction_record(self,merkle):
 		past_transaction = self.past_transaction
 		length = len(merkle)
-		dep = int(math.log2(length))
+		dep = int(log2(length))
 		nodes = pow(2,dep)
 		extra_nodes = length - nodes
 		non = pow(2,dep+1)
@@ -101,7 +102,7 @@ class Blockchain(object):
 
 		while True:  
 			length = len(merkle)
-			dep = int(math.log2(length))
+			dep = int(log2(length))
 			nodes = non = pow(2,dep)      
 			
 			for index in range(0, int(nodes/2)):
