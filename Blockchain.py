@@ -29,7 +29,7 @@ class Blockchain(object):
 			'timestamp' : time(),
 			'proof' : 0, 
 			'previous_hash' : previous_hash or self.chain[-1]['block_hash'],
-			'transaction_hash': self.merkle,
+			'transaction_hash': self.past_transaction[1],
 		}
 		block_header = self.proof_of_work(block_header)
 		block_hash = self.hash(block_header)
@@ -79,7 +79,7 @@ class Blockchain(object):
 		거래내용을 sha256 해시함수를 사용해 변환
 		-OrderedDict 형태로 저장되며, root node 의 index를 1로 시작하여 BFS 알고리즘에 따라 노드에 부여한 index를 key로 가짐
 		:param
-		merkle : 블록의 들어갈 거래 내역
+		merkle : 현재까지 거래 내역
 	'''
 	def transaction_record(self,merkle):
 		past_transaction = self.past_transaction
