@@ -150,7 +150,7 @@ class Blockchain(object):
 			print("{}".format(block))
 			print("\n------------\n")
 
-			if block_h['previous_hash'] != last_block['block_hash']:
+			if block_h['previous_hash'] != hash(last_block['block_header']):
 				return False
 
 			if not self.valid_proof(block_h):
